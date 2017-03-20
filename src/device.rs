@@ -5,7 +5,7 @@ use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use byteorder::{ByteOrder, LittleEndian};
 
-use display::{Display, DisplayError, Pixel};
+use display::{Display, DisplayError, Pixel, Orientation};
 
 use std::fmt;
 
@@ -206,16 +206,20 @@ impl SenseHat {
         }
     }
 
+    pub fn set_rotation(&mut self, ori: Orientation, redraw: bool) {
+        self.display.set_rotation(ori, redraw);
+    }
+
     pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
         self.display.set_pixels(pixel_list);
     }
 
-    pub fn set_pixel(&mut self, pos: (usize, usize), p: Pixel) {
-        self.display.set_pixel(pos, p);
+    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) {
+        self.display.set_pixel(x, y, p);
     }
 
-    pub fn clear(&mut self) {
-        self.display.clear();
+    pub fn clear(&mut self, color: Option<Pixel>) {
+        self.display.clear(color);
     }
 }
 

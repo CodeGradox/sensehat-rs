@@ -12,5 +12,5 @@ fn main() {
         sense_hat.set_pixels(&color[i]);
         sleep(Duration::from_millis(1000));
     }
-    sense_hat.clear();
+    sense_hat.clear(None);
 }
