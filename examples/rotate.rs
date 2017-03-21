@@ -14,7 +14,7 @@ fn main() {
 
     let color = (255, 0, 0);
     for i in 0..8 {
-        sense_hat.set_pixel(i, 0, color);
+        sense_hat.set_pixel(i, 0, color).unwrap();
     }
 
     sleep(Duration::from_millis(1000));

@@ -5,7 +5,7 @@ use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use byteorder::{ByteOrder, LittleEndian};
 
-use display::{Display, DisplayError, Pixel, Orientation};
+use display::{Display, DisplayError, DisplayResult, Pixel, Orientation};
 
 use std::fmt;
 
@@ -210,12 +210,28 @@ impl SenseHat {
         self.display.set_rotation(ori, redraw);
     }
 
+    pub fn flip_h(&mut self, redraw: bool) -> [Pixel; 64] {
+        self.display.flip_h(redraw)
+    }
+
+    pub fn flip_v(&mut self, redraw: bool) -> [Pixel; 64] {
+        self.display.flip_v(redraw)
+    }
+
     pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
         self.display.set_pixels(pixel_list);
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) {
-        self.display.set_pixel(x, y, p);
+    pub fn get_pixels(&self) -> [Pixel; 64] {
+        self.display.get_pixels()
+    }
+
+    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
+        self.display.set_pixel(x, y, p)
+    }
+
+    pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
+        self.display.get_pixel(x, y)
     }
 
     pub fn clear(&mut self, color: Option<Pixel>) {
@@ -258,7 +274,7 @@ mod tests {
     #[test]
     pub fn pressure_test() {
         let p = Pressure::from_hectopascals(1000.0);
-        assert_eq!(p.as_bar(), 1.0);
+        assert_eq!(p.as_bars(), 1.0);
         assert_eq!(p.as_psi(), 14.5038);
     }
 }

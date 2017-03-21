@@ -10,6 +10,9 @@ use std::fmt;
 /// (5 for red, 6 for green, 5 for blue, 5+6+5=16)
 pub type Pixel = (u8, u8, u8);
 
+/// A shortcut for Results that can return `T` or `DisplayError`
+pub type DisplayResult<T> = Result<T, DisplayError>;
+
 /// The image orientation.
 /// 0°, 90°, 180°, 270°
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -30,6 +33,7 @@ pub struct Display {
 /// The errors which can occur when using the display.
 #[derive(Debug)]
 pub enum DisplayError {
+    OutOfBounds,
     MissingFramebuffer,
     GlobError(GlobError),
     PatternError(PatternError),
@@ -40,7 +44,7 @@ impl Display {
     /// Try to create a new Display object.
     ///
     /// Will open the sensehat framebuffer and map it to memory.
-    pub fn new() -> Result<Self, DisplayError> {
+    pub fn new() -> DisplayResult<Self> {
         // The id of the sensehat framebuffer
         let rpi_sense_fb = b"RPi-Sense FB";
         
@@ -74,33 +78,87 @@ impl Display {
         }
     }
 
+    /// Flips the pixels on the LED matrix horizontaly.
+    /// Returns a list of the LED pixels.
+    pub fn flip_h(&mut self, redraw: bool) -> [Pixel; 64] {
+        let mut pixels = self.get_pixels();
+        for offset in (0..8).map(|x| x * 8) {
+            pixels[offset..offset + 8].reverse();
+        }
+        if redraw {
+            self.set_pixels(&pixels);   
+        }
+        pixels
+    }
+
+    /// Flips the pixels on the LED matrix vertically.
+    /// Returns a list of the LED pixels.
+    pub fn flip_v(&mut self, redraw: bool) -> [Pixel; 64] {
+        let mut pixels = self.get_pixels();
+        for i in 0..8 {
+            for j in 0..4 {
+                let offset = j * 8;
+                pixels.swap(i + offset, i + 56 - offset);
+            }
+        }
+        if redraw {
+            self.set_pixels(&pixels);
+        }
+        pixels
+    }
+
     /// Updates the entire LED matrix based on a 64 length array of pixel values.
     /// A pixel is a triplet of u8's (red, green, blue).
     pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
         for (pos, pixel) in (0..64).map(|x| x * 2).zip(pixel_list.iter()) {
-            let (msb, lsb) = convert_pixel(*pixel);
+            let (msb, lsb) = convert_from_pixel(*pixel);
             self.frame[pos] = lsb;
             self.frame[pos + 1] = msb;
         }
         self.draw();
     }
 
+    pub fn get_pixels(&self) -> [Pixel; 64] {
+        let mut pixels = [(0, 0, 0); 64];
+        for (idx, fidx) in (0..64).map(|x| x * 2).enumerate() {
+            let lsb = self.frame[fidx];
+            let msb = self.frame[fidx + 1];
+            pixels[idx] = convert_to_pixel(msb, lsb);
+        }
+        pixels
+    }
+
     /// Sets a single LED matrix pixel at the given (x, y) coordinate
     /// to the given color.
-    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) {
-        // TODO: return an error if x or y are out of bounds?
-        if x > 7 || y > 7 { return; }
+    /// Returns an error if the coordinates are out of bounds.
+    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
+        if x > 7 || y > 7 {
+            return Err(DisplayError::OutOfBounds);
+        }
         let pos = 2 * (x + 8 * y);
-        let (msb, lsb) = convert_pixel(p);
+        let (msb, lsb) = convert_from_pixel(p);
         self.frame[pos] = lsb;
         self.frame[pos + 1] = msb;
         self.draw();
+        Ok(())
     }
 
-    /// Rotates the LED matrix display based on the orientation.
+    /// Returns a single pixel value at the given coordinate.
+    /// Returns an error if the coordinates are out of bounds.
+    pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
+        if x > 7 || y > 7 {
+            return Err(DisplayError::OutOfBounds);
+        }
+        let pos = self.rotation_func(x, y);
+        let lsb = self.frame[pos];
+        let msb = self.frame[pos + 1];
+        let pixel = convert_to_pixel(msb, lsb);
+        Ok(pixel)
+    }
+
+    /// Rotates and draws the LED matrix display based on the orientation.
     fn draw(&mut self) {
         if self.orientation == Orientation::Deg0 {
-            // No need to flip the image as this is the default orientation.
             self.framebuffer.write_frame(&self.frame);
         } else {
             let mut temp = [0; 128];
@@ -121,7 +179,7 @@ impl Display {
     pub fn clear(&mut self, color: Option<Pixel>) {
         match color {
             Some(c) => {
-                let (msb, lsb) = convert_pixel(c);
+                let (msb, lsb) = convert_from_pixel(c);
                 for pos in (0..64).map(|x| x * 2) {
                     self.frame[pos] = lsb;
                     self.frame[pos + 1] = msb;
@@ -151,12 +209,20 @@ impl Display {
     }
 }
 
-/// Converts a rgb888 pixel into a rgb565 pixel
-fn convert_pixel(p: Pixel) -> (u8, u8) {
+/// Converts a rgb888 pixel into a rgb565 pixel.
+fn convert_from_pixel(p: Pixel) -> (u8, u8) {
     let r = p.0 & 0xF8;
     let g = p.1 >> 2;
     let b = p.2 >> 3;
     (r | (g >> 3), (g << 5) | b)
+}
+
+/// Converts a rgb565 pixel to a rgb888 pixel.
+fn convert_to_pixel(msb: u8, lsb: u8) -> Pixel {
+    let r = msb & 0xF8;
+    let g = ((msb & 0x07) << 3) | (lsb & 0xE0);
+    let b = lsb & 0x1F;
+    (r, g << 2, b << 3)
 }
 
 impl fmt::Debug for Display {
