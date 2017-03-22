@@ -1,7 +1,6 @@
 extern crate sensehat;
 
-use sensehat::SenseHat;
-use sensehat::display::{Orientation, Pixel};
+use sensehat::{SenseHat, Pixel};
 
 use std::time::Duration;
 use std::thread::sleep;

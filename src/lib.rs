@@ -7,4 +7,5 @@ extern crate glob;
 pub mod device;
 pub mod display;
 
-pub use device::SenseHat;
+pub use device::*;
+pub use display::*;

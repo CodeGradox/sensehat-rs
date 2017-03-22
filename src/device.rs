@@ -206,34 +206,175 @@ impl SenseHat {
         }
     }
 
+    /// If you're using the Pi upside down or sideways you can use this function
+    /// to correct the orientation of the image being shown.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Orientation};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// sense.set_rotation(Orientation::Deg180);
+    /// ```
     pub fn set_rotation(&mut self, ori: Orientation, redraw: bool) {
         self.display.set_rotation(ori, redraw);
     }
 
+    /// Flips the image on the LED matrix horizontally.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Pixel};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// # Flip the frame and redraw it.
+    /// sense.flip_h(true);
+    /// # Flip the frame, but don't redraw it
+    /// let pixels: [Pixel; 64] = sense.slip(false);
+    /// ```
     pub fn flip_h(&mut self, redraw: bool) -> [Pixel; 64] {
         self.display.flip_h(redraw)
     }
 
+    /// Flips the image on the LED matrix vertically.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Pixel};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// # Flip the frame and redraw it.
+    /// sense.flip_v(true);
+    /// # Flip the frame, but don't redraw it
+    /// let pixels: [Pixel; 64] = sense.flip_v(false);
+    /// ```
     pub fn flip_v(&mut self, redraw: bool) -> [Pixel; 64] {
         self.display.flip_v(redraw)
     }
 
+    /// Updates the entire LED matrix based on a 64 length array of pixel values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Pixel};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// let r: Pixel = (255, 0, 0);
+    /// let w: Pixel = (255, 255, 255);
+    ///
+    /// let question_mark: [Pixel; 64] = [
+    ///    w, w, w, r, r, w, w, w,
+    ///    w, w, r, w, w, r, w, w,
+    ///    w, w, w, w, w, r, w, w,
+    ///    w, w, w, w, r, w, w, w,
+    ///    w, w, w, r, w, w, w, w,
+    ///    w, w, w, r, w, w, w, w,
+    ///    w, w, w, w, w, w, w, w,
+    ///    w, w, w, r, w, w, w, w];
+    ///
+    /// sense.set_pixels(&question_mark);
+    /// ```
     pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
         self.display.set_pixels(pixel_list);
     }
 
+    /// Returns an array of pixels representing the currently displayed image.
+    ///
+    /// # Note
+    ///
+    /// You will notice that the pixel values you pass into `set_pixels` sometimes
+    /// change when you read them back with `get_pixels`. This is because we specify
+    /// each pixel element as 8 bit numbers (0 to 255) but when they're passed into the
+    /// Linux frame buffer for the LED matrix the numbers are bit shifted down to fit
+    /// into RGB 565. 5 bits for red, 6 bits for green and 5 bits for blue. The loss of
+    /// binary precision when performing this conversion (3 bits lost for red, 2 for
+    /// green and 3 for blue) accounts for the discrepancies you see.
+    ///
+    /// The `get_pixels` function provides a correct representation of how the pixels
+    /// end up in frame buffer memory after you've called `set_pixels`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Pixel};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// let pixel_list: [Pixel; 64] = sense.get_pixels();
+    /// ```
     pub fn get_pixels(&self) -> [Pixel; 64] {
         self.display.get_pixels()
     }
 
+    /// Sets an individual LED matrix pixel at the specified X-Y coordinate to the
+    /// specified colour. Returns an error if `x` or `y` is greater than 7.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::SenseHat;
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    ///
+    /// # examples using (x, y, (r, g, b));
+    /// sense.set_pixel(0, 0, (255, 0, 0));
+    /// sense.set_pixel(0, 7, (0, 255, 0));
+    /// sense.set_pixel(7, 0, (0, 0, 255));
+    /// sense.set_pixel(7, 7, (255, 0, 255));
+    ///
+    /// let red = (255, 0, 0);
+    /// let green = (0, 255, 0);
+    /// let blue = (0, 0, 255);
+    ///
+    /// # examples using (x, y, Pixel)
+    /// sense.set_pixel(0, 0, red);
+    /// sense.set_pixel(0, 0, green);
+    /// sense.set_pixel(0, 0, blue);
+    /// ```
     pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
         self.display.set_pixel(x, y, p)
     }
 
+    /// Returns a single pixel at the given (`x`, `y`) coordinate from
+    /// the currently displayed image. Returns an error if `x` or `y` is greater than 7.
+    ///
+    /// # Note
+    ///
+    /// Please read the note under `get_pixels`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::{SenseHat, Pixel};
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    /// let top_left_pixel: Pixel = sense.get_pixel(0, 0);
+    /// ```
     pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
         self.display.get_pixel(x, y)
     }
 
+    /// Sets the entire LED matrix to a single colour. If the given `Option` is `None`,
+    /// it will turn the screen blank / off.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sensehat::SenseHat;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let sense = SenseHat::new().unwrap();
+    ///
+    /// let red = (255, 0, 0);
+    ///
+    /// sense.clear(None); # None turns the screen off
+    /// sleep(Duration::from_millis(1000));
+    /// sense.clear(Some(red)); # turns the whole screen red
+    /// ```
     pub fn clear(&mut self, color: Option<Pixel>) {
         self.display.clear(color);
     }
