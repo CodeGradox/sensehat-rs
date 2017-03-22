@@ -319,20 +319,20 @@ impl SenseHat {
     ///
     /// let sense = SenseHat::new().unwrap();
     ///
-    /// // examples using (x, y, (r, g, b));
-    /// sense.set_pixel(0, 0, (255, 0, 0));
-    /// sense.set_pixel(0, 7, (0, 255, 0));
-    /// sense.set_pixel(7, 0, (0, 0, 255));
-    /// sense.set_pixel(7, 7, (255, 0, 255));
+    /// // examples using (x, y, (r, g, b)).unwrap();
+    /// sense.set_pixel(0, 0, (255, 0, 0)).unwrap();
+    /// sense.set_pixel(0, 7, (0, 255, 0)).unwrap();
+    /// sense.set_pixel(7, 0, (0, 0, 255)).unwrap();
+    /// sense.set_pixel(7, 7, (255, 0, 255)).unwrap();
     ///
     /// let red = (255, 0, 0);
     /// let green = (0, 255, 0);
     /// let blue = (0, 0, 255);
     ///
     /// // examples using (x, y, Pixel)
-    /// sense.set_pixel(0, 0, red);
-    /// sense.set_pixel(0, 0, green);
-    /// sense.set_pixel(0, 0, blue);
+    /// sense.set_pixel(0, 0, red).unwrap();
+    /// sense.set_pixel(0, 0, green).unwrap();
+    /// sense.set_pixel(0, 0, blue).unwrap();
     /// ```
     pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
         self.display.set_pixel(x, y, p)
