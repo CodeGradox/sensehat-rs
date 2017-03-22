@@ -229,9 +229,9 @@ impl SenseHat {
     /// use sensehat::{SenseHat, Pixel};
     ///
     /// let sense = SenseHat::new().unwrap();
-    /// # Flip the frame and redraw it.
+    /// // Flip the frame and redraw it.
     /// sense.flip_h(true);
-    /// # Flip the frame, but don't redraw it
+    /// // Flip the frame, but don't redraw it
     /// let pixels: [Pixel; 64] = sense.slip(false);
     /// ```
     pub fn flip_h(&mut self, redraw: bool) -> [Pixel; 64] {
@@ -246,9 +246,9 @@ impl SenseHat {
     /// use sensehat::{SenseHat, Pixel};
     ///
     /// let sense = SenseHat::new().unwrap();
-    /// # Flip the frame and redraw it.
+    /// // Flip the frame and redraw it.
     /// sense.flip_v(true);
-    /// # Flip the frame, but don't redraw it
+    /// // Flip the frame, but don't redraw it
     /// let pixels: [Pixel; 64] = sense.flip_v(false);
     /// ```
     pub fn flip_v(&mut self, redraw: bool) -> [Pixel; 64] {
@@ -319,7 +319,7 @@ impl SenseHat {
     ///
     /// let sense = SenseHat::new().unwrap();
     ///
-    /// # examples using (x, y, (r, g, b));
+    /// // examples using (x, y, (r, g, b));
     /// sense.set_pixel(0, 0, (255, 0, 0));
     /// sense.set_pixel(0, 7, (0, 255, 0));
     /// sense.set_pixel(7, 0, (0, 0, 255));
@@ -329,7 +329,7 @@ impl SenseHat {
     /// let green = (0, 255, 0);
     /// let blue = (0, 0, 255);
     ///
-    /// # examples using (x, y, Pixel)
+    /// // examples using (x, y, Pixel)
     /// sense.set_pixel(0, 0, red);
     /// sense.set_pixel(0, 0, green);
     /// sense.set_pixel(0, 0, blue);
@@ -371,9 +371,10 @@ impl SenseHat {
     ///
     /// let red = (255, 0, 0);
     ///
-    /// sense.clear(None); # None turns the screen off
+    /// sense.clear(None); // None turns the screen off
     /// sleep(Duration::from_millis(1000));
-    /// sense.clear(Some(red)); # turns the whole screen red
+    /// sense.clear(Some(red)); // turns the whole screen red
+    ///
     /// ```
     pub fn clear(&mut self, color: Option<Pixel>) {
         self.display.clear(color);
