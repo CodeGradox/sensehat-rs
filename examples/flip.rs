@@ -1,6 +1,6 @@
 extern crate sensehat;
 
-use sensehat::{SenseHat, Pixel};
+use sensehat::*;
 
 use std::time::Duration;
 use std::thread::sleep;

@@ -1,7 +1,16 @@
+use libc::{ioctl, c_ulong};
+
 use framebuffer::{Framebuffer, FramebufferError};
 use glob::{glob, GlobError, PatternError};
 
 use std::fmt;
+use std::os::unix::io::AsRawFd;
+
+const SENSE_HAT_FBIOGET_GAMMA: c_ulong = 61696;
+const SENSE_HAT_FBIOSET_GAMMA: c_ulong = 61697;
+const SENSE_HAT_FBIORESET_GAMMA: c_ulong = 61698;
+const SENSE_HAT_GAMMA_DEFAULT: c_ulong = 0;
+const SENSE_HAT_GAMMA_LOW: c_ulong = 1;
 
 /// A rgb888 color pixel.
 ///
@@ -11,7 +20,7 @@ use std::fmt;
 pub type Pixel = (u8, u8, u8);
 
 /// A shortcut for Results that can return `T` or `DisplayError`
-pub type DisplayResult<T> = Result<T, DisplayError>;
+type DisplayResult<T> = Result<T, DisplayError>;
 
 /// The image orientation.
 /// 0°, 90°, 180°, 270°
@@ -34,6 +43,7 @@ pub struct Display {
 #[derive(Debug)]
 pub enum DisplayError {
     OutOfBounds,
+    InvalidGamma,
     MissingFramebuffer,
     GlobError(GlobError),
     PatternError(PatternError),
@@ -66,6 +76,45 @@ impl Display {
                 orientation: Orientation::Deg0,
                 }),
             None => Err(DisplayError::MissingFramebuffer),
+        }
+    }
+
+    /// Helper function.
+    ///
+    /// Rotates and draws the LED matrix display based on the orientation.
+    fn draw(&mut self) {
+        if self.orientation == Orientation::Deg0 {
+            self.framebuffer.write_frame(&self.frame);
+        } else {
+            let mut temp = [0; 128];
+            let mut i = 0;
+            for y in 0..8 {
+                for x in 0..8 {
+                    let cor = self.rotation_func(x, y);
+                    temp[cor] = self.frame[i];
+                    temp[cor + 1] = self.frame[i + 1];
+                    i += 2;
+                }
+            }
+            self.framebuffer.write_frame(&temp);
+        }
+    }
+
+    /// Helper function.
+    ///
+    /// Function for mapping a (x, y) coordinate on the
+    /// 2D LED matrix to a 1D position on the frame.
+    /// A pixel in the frame is actually 16-bit, but since we can
+    /// only write to the framebuffer with u8 slices, we have to
+    /// split up each pixel in two. This function returns the position
+    /// of the 8 MSB of a pixel.
+    fn rotation_func(&self, x: usize, y: usize) -> usize {
+        use self::Orientation::*;
+        match self.orientation {
+            Deg0 => 2 * (x + 8 * y),
+            Deg90 => 2 * ((7 - y) + 8 * x),
+            Deg180 => 126 - 2 * (x + 8 * y),
+            Deg270 => 2 * (y + 8 * (7 - x)),
         }
     }
 
@@ -118,6 +167,7 @@ impl Display {
         self.draw();
     }
 
+    /// Get a vector of all `Pixel`s on the currently displayed image.
     pub fn get_pixels(&self) -> [Pixel; 64] {
         let mut pixels = [(0, 0, 0); 64];
         for (idx, fidx) in (0..64).map(|x| x * 2).enumerate() {
@@ -156,25 +206,6 @@ impl Display {
         Ok(pixel)
     }
 
-    /// Rotates and draws the LED matrix display based on the orientation.
-    fn draw(&mut self) {
-        if self.orientation == Orientation::Deg0 {
-            self.framebuffer.write_frame(&self.frame);
-        } else {
-            let mut temp = [0; 128];
-            let mut i = 0;
-            for y in 0..8 {
-                for x in 0..8 {
-                    let cor = self.rotation_func(x, y);
-                    temp[cor] = self.frame[i];
-                    temp[cor + 1] = self.frame[i + 1];
-                    i += 2;
-                }
-            }
-            self.framebuffer.write_frame(&temp);
-        }
-    }
-
     /// Sets the entire LED matrix to a single color, defaults to blank/off.
     pub fn clear(&mut self, color: Option<Pixel>) {
         match color {
@@ -192,19 +223,52 @@ impl Display {
         self.framebuffer.write_frame(&self.frame);
     }
 
-    /// Helper function for mapping a (x, y) coordinate on the
-    /// 2D LED matrix to a 1D position on the frame.
-    /// A pixel in the frame is actually 16-bit, but since we can
-    /// only write to the framebuffer with u8 slices, we have to
-    /// split up each pixel in two. This function returns the position
-    /// of the 8 MSB of a pixel.
-    fn rotation_func(&self, x: usize, y: usize) -> usize {
-        use self::Orientation::*;
-        match self.orientation {
-            Deg0 => 2 * (x + 8 * y),
-            Deg90 => 2 * ((7 - y) + 8 * x),
-            Deg180 => 126 - 2 * (x + 8 * y),
-            Deg270 => 2 * (y + 8 * (7 - x)),
+    /// Retuns the current gamma settings.
+    pub fn gamma(&self) -> [u8; 32] {
+        let mut buffer = [0u8; 32];
+        unsafe {
+            let fd = self.framebuffer.device.as_raw_fd();
+            ioctl(fd, SENSE_HAT_FBIOGET_GAMMA, &mut buffer);
+            // TODO: Maybe check ioctl return value for errors.
+        }
+        buffer
+    }
+
+    /// Changes the gamma settings.
+    pub fn set_gamma(&mut self, buffer: &[u8; 32]) -> DisplayResult<()> {
+        if !buffer.iter().all(|&x| x <= 31) {
+            return Err(DisplayError::InvalidGamma);
+        }
+        unsafe {
+            let fd = self.framebuffer.device.as_raw_fd();
+            ioctl(fd, SENSE_HAT_FBIOSET_GAMMA, buffer);
+            // TODO: Maybe check ioctl return value for errors.
+        }
+        Ok(())
+    }
+
+    /// Resets the LED matrix gamma correction to default.
+    pub fn reset_gamma(&mut self) {
+        unsafe {
+            let fd = self.framebuffer.device.as_raw_fd();
+            ioctl(fd, SENSE_HAT_FBIORESET_GAMMA, SENSE_HAT_GAMMA_DEFAULT);
+            // TODO: Maybe check ioctl return value for errors.
+        }
+    }
+
+    /// Checks if the display is set to low light mode.
+    pub fn is_low_light(&self) -> bool {
+        let low: [u8; 32] = [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10, 10];
+        let cur_gamma = self.gamma();
+        cur_gamma == low
+    }
+
+    /// Enables or disables low light mode.
+    pub fn low_light(&mut self, set_low: bool) {
+        unsafe {
+            let fd = self.framebuffer.device.as_raw_fd();
+            let cmd = if set_low { SENSE_HAT_GAMMA_LOW } else { SENSE_HAT_GAMMA_DEFAULT };
+            ioctl(fd, SENSE_HAT_FBIORESET_GAMMA, cmd);
         }
     }
 }

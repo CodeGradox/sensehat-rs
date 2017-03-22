@@ -5,7 +5,7 @@ use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use byteorder::{ByteOrder, LittleEndian};
 
-use display::{Display, DisplayError, DisplayResult, Pixel, Orientation};
+use display::{Display, DisplayError, Pixel, Orientation};
 
 use std::fmt;
 
@@ -334,8 +334,8 @@ impl SenseHat {
     /// sense.set_pixel(0, 0, green).unwrap();
     /// sense.set_pixel(0, 0, blue).unwrap();
     /// ```
-    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
-        self.display.set_pixel(x, y, p)
+    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> SenseHatResult<()> {
+        self.display.set_pixel(x, y, p).map_err(SenseHatError::from)
     }
 
     /// Returns a single pixel at the given (`x`, `y`) coordinate from
@@ -353,8 +353,8 @@ impl SenseHat {
     /// let sense = SenseHat::new().unwrap();
     /// let top_left_pixel: Pixel = sense.get_pixel(0, 0).unwrap();
     /// ```
-    pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
-        self.display.get_pixel(x, y)
+    pub fn get_pixel(&self, x: usize, y: usize) -> SenseHatResult<Pixel> {
+        self.display.get_pixel(x, y).map_err(SenseHatError::from)
     }
 
     /// Sets the entire LED matrix to a single colour. If the given `Option` is `None`,
@@ -378,6 +378,26 @@ impl SenseHat {
     /// ```
     pub fn clear(&mut self, color: Option<Pixel>) {
         self.display.clear(color);
+    }
+
+    pub fn gamma(&self) -> [u8; 32] {
+        self.display.gamma()
+    }
+
+    pub fn set_gamma(&mut self, buffer: &[u8; 32]) -> SenseHatResult<()> {
+        self.display.set_gamma(&buffer).map_err(SenseHatError::from)
+    }
+
+    pub fn reset_gamma(&mut self) {
+        self.display.reset_gamma()
+    }
+
+    pub fn is_low_light(&self) -> bool {
+        self.display.is_low_light()
+    }
+
+    pub fn low_light(&mut self, set_low: bool) {
+        self.display.low_light(set_low);
     }
 }
 
