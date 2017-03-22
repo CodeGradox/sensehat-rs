@@ -319,7 +319,7 @@ impl SenseHat {
     ///
     /// let sense = SenseHat::new().unwrap();
     ///
-    /// // examples using (x, y, (r, g, b)).unwrap();
+    /// // examples using (x, y, (r, g, b))
     /// sense.set_pixel(0, 0, (255, 0, 0)).unwrap();
     /// sense.set_pixel(0, 7, (0, 255, 0)).unwrap();
     /// sense.set_pixel(7, 0, (0, 0, 255)).unwrap();
