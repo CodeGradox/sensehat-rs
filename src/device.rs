@@ -351,7 +351,7 @@ impl SenseHat {
     /// use sensehat::{SenseHat, Pixel};
     ///
     /// let sense = SenseHat::new().unwrap();
-    /// let top_left_pixel: Pixel = sense.get_pixel(0, 0);
+    /// let top_left_pixel: Pixel = sense.get_pixel(0, 0).unwrap();
     /// ```
     pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
         self.display.get_pixel(x, y)
