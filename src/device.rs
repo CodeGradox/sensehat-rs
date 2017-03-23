@@ -278,8 +278,8 @@ impl SenseHat {
     ///
     /// sense.set_pixels(&question_mark);
     /// ```
-    pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
-        self.display.set_pixels(pixel_list);
+    pub fn set_pixels(&mut self, pixels: &[Pixel; 64]) {
+        self.display.set_pixels(pixels);
     }
 
     /// Returns an array of pixels representing the currently displayed image.

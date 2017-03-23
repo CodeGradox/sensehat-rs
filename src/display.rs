@@ -2,6 +2,7 @@ use libc::{ioctl, c_ulong};
 
 use framebuffer::{Framebuffer, FramebufferError};
 use glob::{glob, GlobError, PatternError};
+use byteorder::{ByteOrder, LittleEndian};
 
 use std::fmt;
 use std::os::unix::io::AsRawFd;
@@ -90,9 +91,9 @@ impl Display {
             let mut i = 0;
             for y in 0..8 {
                 for x in 0..8 {
-                    let cor = self.rotation_func(x, y);
-                    temp[cor] = self.frame[i];
-                    temp[cor + 1] = self.frame[i + 1];
+                    let cor = self.map_position(x, y);
+                    let pixel = LittleEndian::read_u16(&self.frame[i..i+2]);
+                    LittleEndian::write_u16(&mut temp[cor..], pixel);
                     i += 2;
                 }
             }
@@ -108,7 +109,7 @@ impl Display {
     /// only write to the framebuffer with u8 slices, we have to
     /// split up each pixel in two. This function returns the position
     /// of the 8 MSB of a pixel.
-    fn rotation_func(&self, x: usize, y: usize) -> usize {
+    fn map_position(&self, x: usize, y: usize) -> usize {
         use self::Orientation::*;
         match self.orientation {
             Deg0 => 2 * (x + 8 * y),
@@ -131,8 +132,8 @@ impl Display {
     /// Returns a list of the LED pixels.
     pub fn flip_h(&mut self, redraw: bool) -> [Pixel; 64] {
         let mut pixels = self.get_pixels();
-        for offset in (0..8).map(|x| x * 8) {
-            pixels[offset..offset + 8].reverse();
+        for slice in pixels[..].chunks_mut(8) {
+            slice.reverse();
         }
         if redraw {
             self.set_pixels(&pixels);   
@@ -158,11 +159,13 @@ impl Display {
 
     /// Updates the entire LED matrix based on a 64 length array of pixel values.
     /// A pixel is a triplet of u8's (red, green, blue).
-    pub fn set_pixels(&mut self, pixel_list: &[Pixel; 64]) {
-        for (pos, pixel) in (0..64).map(|x| x * 2).zip(pixel_list.iter()) {
-            let (msb, lsb) = convert_from_pixel(*pixel);
-            self.frame[pos] = lsb;
-            self.frame[pos + 1] = msb;
+    pub fn set_pixels(&mut self, pixels: &[Pixel; 64]) {
+        for (pos, pixel) in self.frame[..]
+            .chunks_mut(2)
+            .zip(pixels.iter()
+                       .map(|&p| convert_from_pixel(p)))
+        {
+            LittleEndian::write_u16(pos, pixel);
         }
         self.draw();
     }
@@ -170,10 +173,14 @@ impl Display {
     /// Get a vector of all `Pixel`s on the currently displayed image.
     pub fn get_pixels(&self) -> [Pixel; 64] {
         let mut pixels = [(0, 0, 0); 64];
-        for (idx, fidx) in (0..64).map(|x| x * 2).enumerate() {
-            let lsb = self.frame[fidx];
-            let msb = self.frame[fidx + 1];
-            pixels[idx] = convert_to_pixel(msb, lsb);
+        for (index, value) in pixels
+            .iter_mut()
+            .zip(self.frame[..]
+                     .chunks(2)
+                     .map(LittleEndian::read_u16)
+                     .map(convert_to_pixel))
+        {
+            *index = value;
         }
         pixels
     }
@@ -186,9 +193,8 @@ impl Display {
             return Err(DisplayError::OutOfBounds);
         }
         let pos = 2 * (x + 8 * y);
-        let (msb, lsb) = convert_from_pixel(p);
-        self.frame[pos] = lsb;
-        self.frame[pos + 1] = msb;
+        let pixel = convert_from_pixel(p);
+        LittleEndian::write_u16(&mut self.frame[pos..], pixel);
         self.draw();
         Ok(())
     }
@@ -199,10 +205,9 @@ impl Display {
         if x > 7 || y > 7 {
             return Err(DisplayError::OutOfBounds);
         }
-        let pos = self.rotation_func(x, y);
-        let lsb = self.frame[pos];
-        let msb = self.frame[pos + 1];
-        let pixel = convert_to_pixel(msb, lsb);
+        let pos = self.map_position(x, y);
+        let value = LittleEndian::read_u16(&self.frame[pos..]);
+        let pixel = convert_to_pixel(value);
         Ok(pixel)
     }
 
@@ -210,10 +215,9 @@ impl Display {
     pub fn clear(&mut self, color: Option<Pixel>) {
         match color {
             Some(c) => {
-                let (msb, lsb) = convert_from_pixel(c);
-                for pos in (0..64).map(|x| x * 2) {
-                    self.frame[pos] = lsb;
-                    self.frame[pos + 1] = msb;
+                let pixel = convert_from_pixel(c);
+                for pos in self.frame[..].chunks_mut(2) {
+                    LittleEndian::write_u16(pos, pixel);
                 }
             }
             None => {
@@ -274,15 +278,16 @@ impl Display {
 }
 
 /// Converts a rgb888 pixel into a rgb565 pixel.
-fn convert_from_pixel(p: Pixel) -> (u8, u8) {
-    let r = p.0 & 0xF8;
-    let g = p.1 >> 2;
-    let b = p.2 >> 3;
-    (r | (g >> 3), (g << 5) | b)
+fn convert_from_pixel(p: Pixel) -> u16 {
+    let r = (p.0 >> 3) as u16;
+    let g = (p.1 >> 2) as u16;
+    let b = (p.2 >> 3) as u16;
+    (r << 11) | (g << 5) | b
 }
 
 /// Converts a rgb565 pixel to a rgb888 pixel.
-fn convert_to_pixel(msb: u8, lsb: u8) -> Pixel {
+fn convert_to_pixel(val: u16) -> Pixel {
+    let (msb, lsb) = ((val >> 8) as u8, val as u8);
     let r = msb & 0xF8;
     let g = ((msb & 0x07) << 3) | (lsb & 0xE0);
     let b = lsb & 0x1F;
