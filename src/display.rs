@@ -1,8 +1,9 @@
-use libc::{ioctl, c_ulong};
+use {SenseHatError, SenseHatResult};
 
+use libc::{ioctl, c_ulong};
 use framebuffer::{Framebuffer, FramebufferError};
-use glob::{glob, GlobError, PatternError};
 use byteorder::{ByteOrder, LittleEndian};
+use glob::glob;
 
 use std::fmt;
 use std::os::unix::io::AsRawFd;
@@ -19,9 +20,6 @@ const SENSE_HAT_GAMMA_LOW: c_ulong = 1;
 /// That means a pixel is 16-bit instead of 24-bit.
 /// (5 for red, 6 for green, 5 for blue, 5+6+5=16)
 pub type Pixel = (u8, u8, u8);
-
-/// A shortcut for Results that can return `T` or `DisplayError`
-type DisplayResult<T> = Result<T, DisplayError>;
 
 /// The image orientation.
 /// 0°, 90°, 180°, 270°
@@ -40,22 +38,11 @@ pub struct Display {
     orientation: Orientation,
 }
 
-/// The errors which can occur when using the display.
-#[derive(Debug)]
-pub enum DisplayError {
-    OutOfBounds,
-    InvalidGamma,
-    MissingFramebuffer,
-    GlobError(GlobError),
-    PatternError(PatternError),
-    FramebufferError(FramebufferError),
-}
-
 impl Display {
     /// Try to create a new Display object.
     ///
     /// Will open the sensehat framebuffer and map it to memory.
-    pub fn new() -> DisplayResult<Self> {
+    pub fn new() -> SenseHatResult<Self> {
         // The id of the sensehat framebuffer
         let rpi_sense_fb = b"RPi-Sense FB";
         
@@ -76,7 +63,7 @@ impl Display {
                 frame: [0; 128],
                 orientation: Orientation::Deg0,
                 }),
-            None => Err(DisplayError::MissingFramebuffer),
+            None => Err(SenseHatError::MissingFramebuffer),
         }
     }
 
@@ -92,7 +79,7 @@ impl Display {
             for y in 0..8 {
                 for x in 0..8 {
                     let cor = self.map_position(x, y);
-                    let pixel = LittleEndian::read_u16(&self.frame[i..i+2]);
+                    let pixel = LittleEndian::read_u16(&self.frame[i..]);
                     LittleEndian::write_u16(&mut temp[cor..], pixel);
                     i += 2;
                 }
@@ -188,9 +175,9 @@ impl Display {
     /// Sets a single LED matrix pixel at the given (x, y) coordinate
     /// to the given color.
     /// Returns an error if the coordinates are out of bounds.
-    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> DisplayResult<()> {
+    pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> SenseHatResult<()> {
         if x > 7 || y > 7 {
-            return Err(DisplayError::OutOfBounds);
+            return Err(SenseHatError::OutOfBounds);
         }
         let pos = 2 * (x + 8 * y);
         let pixel = convert_from_pixel(p);
@@ -201,9 +188,9 @@ impl Display {
 
     /// Returns a single pixel value at the given coordinate.
     /// Returns an error if the coordinates are out of bounds.
-    pub fn get_pixel(&self, x: usize, y: usize) -> DisplayResult<Pixel> {
+    pub fn get_pixel(&self, x: usize, y: usize) -> SenseHatResult<Pixel> {
         if x > 7 || y > 7 {
-            return Err(DisplayError::OutOfBounds);
+            return Err(SenseHatError::OutOfBounds);
         }
         let pos = self.map_position(x, y);
         let value = LittleEndian::read_u16(&self.frame[pos..]);
@@ -239,9 +226,9 @@ impl Display {
     }
 
     /// Changes the gamma settings.
-    pub fn set_gamma(&mut self, buffer: &[u8; 32]) -> DisplayResult<()> {
+    pub fn set_gamma(&mut self, buffer: &[u8; 32]) -> SenseHatResult<()> {
         if !buffer.iter().all(|&x| x <= 31) {
-            return Err(DisplayError::InvalidGamma);
+            return Err(SenseHatError::InvalidGamma);
         }
         unsafe {
             let fd = self.framebuffer.device.as_raw_fd();
@@ -299,23 +286,5 @@ impl fmt::Debug for Display {
         write!(f, "Display {{ framebuffer: {:?} orientation: {:?} }}",
             self.framebuffer,
             self.orientation)
-    }
-}
-
-impl From<GlobError> for DisplayError {
-    fn from(err: GlobError) -> Self {
-        DisplayError::GlobError(err)
-    }
-}
-
-impl From<PatternError> for DisplayError {
-    fn from(err: PatternError) -> Self {
-        DisplayError::PatternError(err)
-    }
-}
-
-impl From<FramebufferError> for DisplayError {
-    fn from(err: FramebufferError) -> Self {
-        DisplayError::FramebufferError(err)
     }
 }

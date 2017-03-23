@@ -1,11 +1,13 @@
+use {SenseHatError, SenseHatResult};
+
 pub use measurements::Temperature;
 pub use measurements::Pressure;
 
 use i2cdev::core::I2CDevice;
-use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use i2cdev::linux::LinuxI2CDevice;
 use byteorder::{ByteOrder, LittleEndian};
 
-use display::{Display, DisplayError, Pixel, Orientation};
+use display::{Display, Pixel, Orientation};
 
 use std::fmt;
 
@@ -27,18 +29,6 @@ pub struct SenseHat {
     hum_m: f64,
     hum_c: f64,
 }
-
-/// Errors that this crate can return
-#[derive(Debug)]
-pub enum SenseHatError {
-    NotReady,
-    GenericError,
-    I2CError(LinuxI2CError),
-    DisplayError(DisplayError),
-}
-
-/// A shortcut for Results that can return `T` or `SenseHatError`
-pub type SenseHatResult<T> = Result<T, SenseHatError>;
 
 // Registers for the HT221 humidity sensor
 const HTS221_AV_CONF: u8 = 0x10;
@@ -335,7 +325,7 @@ impl SenseHat {
     /// sense.set_pixel(0, 0, blue).unwrap();
     /// ```
     pub fn set_pixel(&mut self, x: usize, y: usize, p: Pixel) -> SenseHatResult<()> {
-        self.display.set_pixel(x, y, p).map_err(SenseHatError::from)
+        self.display.set_pixel(x, y, p)
     }
 
     /// Returns a single pixel at the given (`x`, `y`) coordinate from
@@ -354,7 +344,7 @@ impl SenseHat {
     /// let top_left_pixel: Pixel = sense.get_pixel(0, 0).unwrap();
     /// ```
     pub fn get_pixel(&self, x: usize, y: usize) -> SenseHatResult<Pixel> {
-        self.display.get_pixel(x, y).map_err(SenseHatError::from)
+        self.display.get_pixel(x, y)
     }
 
     /// Sets the entire LED matrix to a single colour. If the given `Option` is `None`,
@@ -385,7 +375,7 @@ impl SenseHat {
     }
 
     pub fn set_gamma(&mut self, buffer: &[u8; 32]) -> SenseHatResult<()> {
-        self.display.set_gamma(&buffer).map_err(SenseHatError::from)
+        self.display.set_gamma(&buffer)
     }
 
     pub fn reset_gamma(&mut self) {
@@ -398,18 +388,6 @@ impl SenseHat {
 
     pub fn low_light(&mut self, set_low: bool) {
         self.display.low_light(set_low);
-    }
-}
-
-impl From<LinuxI2CError> for SenseHatError {
-    fn from(err: LinuxI2CError) -> Self {
-        SenseHatError::I2CError(err)
-    }
-}
-
-impl From<DisplayError> for SenseHatError {
-    fn from(err: DisplayError) -> Self {
-        SenseHatError::DisplayError(err)
     }
 }
 
@@ -426,17 +404,5 @@ impl RelativeHumidity {
 impl fmt::Display for RelativeHumidity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:.1}%", self.as_percent())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn pressure_test() {
-        let p = Pressure::from_hectopascals(1000.0);
-        assert_eq!(p.as_bars(), 1.0);
-        assert_eq!(p.as_psi(), 14.5038);
     }
 }
