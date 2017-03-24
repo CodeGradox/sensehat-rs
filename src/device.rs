@@ -8,6 +8,7 @@ use i2cdev::linux::LinuxI2CDevice;
 use byteorder::{ByteOrder, LittleEndian};
 
 use display::{Display, Pixel, Orientation};
+use imu::Imu;
 
 use std::fmt;
 
@@ -24,6 +25,8 @@ pub struct SenseHat {
     humidity_dev: LinuxI2CDevice,
     // The 8x8 LED display
     display: Display,
+    // The IMU
+    imu: Imu,
     temp_m: f64,
     temp_c: f64,
     hum_m: f64,
@@ -70,6 +73,7 @@ impl SenseHat {
             pressure_dev: LinuxI2CDevice::new("/dev/i2c-1", 0x5c)?,
             humidity_dev: LinuxI2CDevice::new("/dev/i2c-1", 0x5f)?,
             display: Display::new()?,
+            imu: Imu::new()?,
             temp_m: 0.0,
             temp_c: 0.0,
             hum_m: 0.0,

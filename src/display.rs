@@ -1,7 +1,7 @@
 use {SenseHatError, SenseHatResult};
 
 use libc::{ioctl, c_ulong};
-use framebuffer::{Framebuffer, FramebufferError};
+use framebuffer::Framebuffer;
 use byteorder::{ByteOrder, LittleEndian};
 use glob::glob;
 

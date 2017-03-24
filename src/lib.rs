@@ -8,6 +8,7 @@ extern crate libc;
 mod device;
 mod display;
 mod imu;
+mod settings;
 
 pub use device::*;
 pub use display::*;
